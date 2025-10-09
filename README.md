@@ -45,6 +45,9 @@ bash tools/train_dist.sh
 #test
 bash tools/test_dist.sh
 ```
+## model weights
+I uploaded the weight in google drive, you can download from this url: https://drive.google.com/file/d/1ZeWtgZJKD_yWmFNWwBOMN9_4-x-ZXUuS/view?usp=drive_link
+
 
 ## 📌Citation
 If you find our paper and code useful in your research, please consider giving a star and citation.
