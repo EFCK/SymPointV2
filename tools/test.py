@@ -62,12 +62,16 @@ def save_gt_instances(root, name, scan_ids, gt_insts):
     pool.join()
 
 
+
 def main():
     args = get_args()
     cfg_txt = open(args.config, "r").read()
     cfg = Munch.fromDict(yaml.safe_load(cfg_txt))
     if args.dist:
         init_dist()
+        if not dist.is_available() or not dist.is_initialized():
+            backend = 'nccl' if torch.cuda.is_available() else 'gloo'
+            dist.init_process_group(backend=backend, init_method='env://')
     logger = get_root_logger()
 
     model = svgnet(cfg.model).cuda()
@@ -77,7 +81,10 @@ def main():
     
     if args.dist:
         model = DistributedDataParallel(model, device_ids=[torch.cuda.current_device()])
-    gpu_num = dist.get_world_size()
+        gpu_num = dist.get_world_size() if dist.is_initialized() else 1
+    else:
+        gpu_num = 1
+
 
     logger.info(f"Load state dict from {args.checkpoint}")
     load_checkpoint(args.checkpoint, logger, model)
@@ -86,8 +93,8 @@ def main():
     dataloader = build_dataloader(args,val_set, training=False, dist=args.dist, **cfg.dataloader.test)
 
     time_arr = []
-    sem_point_eval = PointWiseEval(num_classes=cfg.model.semantic_classes,ignore_label=35,gpu_num=dist.get_world_size())
-    instance_eval = InstanceEval(num_classes=cfg.model.semantic_classes,ignore_label=35,gpu_num=dist.get_world_size())
+    sem_point_eval = PointWiseEval(num_classes=cfg.model.semantic_classes,ignore_label=35,gpu_num=gpu_num)
+    instance_eval = InstanceEval(num_classes=cfg.model.semantic_classes,ignore_label=35,gpu_num=gpu_num)
     
     with torch.no_grad():
         model.eval()
