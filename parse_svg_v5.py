@@ -1,4 +1,5 @@
 
+import argparse
 import math,re
 import os,glob,json
 import xml.etree.ElementTree as ET
@@ -11,10 +12,22 @@ LABEL_NUM = 35
 COMMANDS = ['Line', 'Arc','circle', 'ellipse']
 import mmcv
 
-data_dir = './dataset/svg/val/'
-svg_paths = sorted(glob.glob(os.path.join(data_dir,'*.svg')))
-save_dir = data_dir
-os.makedirs(save_dir,exist_ok=True)
+
+
+def parse_args():
+    '''
+    Arguments
+    '''
+    parser = argparse.ArgumentParser(description='')
+    parser.add_argument('--split', type=str, default="test",
+                        help='the split of dataset')
+    parser.add_argument('--data_dir', type=str, default="./dataset/test/test/svg_gt",
+                        help='save the downloaded data')
+    args = parser.parse_args()
+    return args
+
+
+
 
 def parse_svg(svg_file):
     tree = ET.parse(svg_file)
@@ -161,13 +174,17 @@ def process(svg_file):
 
 if __name__=="__main__":
     
+
+
+    args = parse_args()
+    data_dir = args.data_dir
+    svg_paths = sorted(glob.glob(os.path.join(data_dir,'*.svg')))
+    save_dir = os.path.join("./dataset/svg/",args.split)
+    os.makedirs(save_dir,exist_ok=True)
+
     mmcv.track_parallel_progress(process,svg_paths,64)
+        
 
 
-    
-
-
-    
-            
             
             
