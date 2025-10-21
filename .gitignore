@@ -1,3 +1,7 @@
 
 /dataset
 /configs/svg
+/modules/__pycache__
+/svgnet/util/__pycache__
+*.pyc
+/svgnet/model/__pycache__
