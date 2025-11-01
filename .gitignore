@@ -5,3 +5,6 @@
 /svgnet/util/__pycache__
 *.pyc
 /svgnet/model/__pycache__
+/spv2-with-predicted-ids
+/results
+coco_res_val.npy
