@@ -7,6 +7,7 @@ from munch import Munch
 import glob,tqdm
 import os.path as osp
 import numpy as np
+import os
 
 import torch
 
@@ -27,6 +28,30 @@ def get_args():
     return args
 
 
+def has_ground_truth(data_json):
+    """
+    Check if JSON file has ground truth labels (semantic IDs and instance IDs).
+    Returns True if file has non-default labels.
+    """
+    import json
+    data = json.load(open(data_json))
+    semantic_ids = data.get("semanticIds", [])
+    instance_ids = data.get("instanceIds", [])
+    
+    # Check if all semantic IDs are background (LABEL_NUM = 35)
+    if len(semantic_ids) == 0:
+        return False
+    if all(sid == 35 for sid in semantic_ids):
+        return False
+    
+    # Check if any instance IDs are valid (>= 0)
+    if any(iid >= 0 for iid in instance_ids):
+        return True
+    
+    # If we have non-background semantic IDs, we have some ground truth
+    return any(sid < 35 for sid in semantic_ids)
+
+
 def main():
     args = get_args()
     cfg_txt = open(args.config, "r").read()
@@ -40,10 +65,19 @@ def main():
     data_list = glob.glob(osp.join(args.datadir,"*_s2.json"))
     logger.info(f"Load dataset: {len(data_list)} svg")
     
-    sem_point_eval = PointWiseEval(num_classes=cfg.model.semantic_classes,ignore_label=cfg.model.semantic_classes,gpu_num=1)
-    instance_eval = InstanceEval(num_classes=cfg.model.semantic_classes,ignore_label=cfg.model.semantic_classes,gpu_num=1)
+    # Only create evaluators if we have ground truth data
+    has_gt_data = any(has_ground_truth(f) for f in data_list)
+    
+    if has_gt_data:
+        sem_point_eval = PointWiseEval(num_classes=cfg.model.semantic_classes,ignore_label=cfg.model.semantic_classes,gpu_num=1)
+        instance_eval = InstanceEval(num_classes=cfg.model.semantic_classes,ignore_label=cfg.model.semantic_classes,gpu_num=1)
+    else:
+        logger.info("No ground truth labels found - skipping evaluation metrics")
+    
     save_dicts = []
     total_times = []
+    eval_count = 0
+    
     with torch.no_grad():
         model.eval()
         for svg_file in tqdm.tqdm(data_list):
@@ -62,16 +96,21 @@ def main():
                 res = model(batch,return_loss=False)
                 t2 = time.time()
                 total_times.append(t2-t1)
-                sem_preds = torch.argmax(res["semantic_scores"],dim=1).cpu().numpy()
-                sem_gts = res["semantic_labels"].cpu().numpy()
-                sem_point_eval.update(sem_preds, sem_gts)
-                instance_eval.update(
-                    res["instances"],
-                    res["targets"],
-                    res["lengths"],
-                )
+                
+                # Only evaluate if we have ground truth
+                if has_gt_data and has_ground_truth(svg_file):
+                    sem_preds = torch.argmax(res["semantic_scores"],dim=1).cpu().numpy()
+                    sem_gts = res["semantic_labels"].cpu().numpy()
+                    sem_point_eval.update(sem_preds, sem_gts)
+                    instance_eval.update(
+                        res["instances"],
+                        res["targets"],
+                        res["lengths"],
+                    )
+                    eval_count += 1
+                
                 save_dicts.append({
-                    "filepath": svg_file.replace(".json",".svg"),
+                    "filepath": svg_file.replace("dataset/json/", "dataset/svg/").replace("_s2.json",".svg"),
                     "sem": res["semantic_scores"].cpu().numpy(),
                     "ins": res["instances"],
                     "targets":res["targets"],
@@ -79,11 +118,16 @@ def main():
                 })
                     
                     
-    np.save('sem_ins_split_val.npy', save_dicts)            
-    logger.info("Evaluate semantic segmentation")
-    sem_point_eval.get_eval(logger)
-    logger.info("Evaluate panoptic segmentation")
-    instance_eval.get_eval(logger)
+    os.makedirs(args.out,exist_ok=True)
+    np.save(osp.join(args.out, 'model_output.npy'), save_dicts)
+    
+    if has_gt_data and eval_count > 0:
+        logger.info("Evaluate semantic segmentation")
+        sem_point_eval.get_eval(logger)
+        logger.info("Evaluate panoptic segmentation")
+        instance_eval.get_eval(logger)
+    else:
+        logger.info(f"Saved predictions for {len(save_dicts)} files (no ground truth for evaluation)")
  
 if __name__ == "__main__":
     main()       
