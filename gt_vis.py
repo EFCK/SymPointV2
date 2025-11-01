@@ -64,7 +64,7 @@ def collect_dataset():
     for svg_file in svg_file:
         if "_res" in svg_file: continue
         if "_s2" in svg_file: continue
-        json_file = svg_file.replace(".svg", '_s2.json')
+        json_file = svg_file.replace("dataset/svg/", "dataset/json/").replace(".svg", '_s2.json')
         if not osp.exists(json_file): continue
         #if "0006-0015" not in json_file: continue
         datasets.append({

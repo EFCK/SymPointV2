@@ -109,7 +109,7 @@ if __name__ == "__main__":
     inputs = []
     for det in tqdm.tqdm(detections):
         svg_file = det['filepath']
-        json_file = svg_file.replace('.svg','.json')
+        json_file = svg_file.replace('dataset/svg/', 'dataset/json/').replace('.svg','_s2.json')
         instances = det['instances']
         inputs.append([json_file, instances, vis_dir])
     

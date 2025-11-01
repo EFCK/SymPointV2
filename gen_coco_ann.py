@@ -121,11 +121,12 @@ if __name__ == "__main__":
     
     import os.path as osp
     import glob
-    data_root = "dataset/svg"
-    files = glob.glob(osp.join(data_root,"val", "*.svg"))
+    svg_root = "dataset/svg"
+    json_root = "dataset/json"
+    files = glob.glob(osp.join(svg_root,"val", "*.svg"))
     inputs = []
     for svg_file in files:
-        json_file = svg_file.replace('.svg','.json')
+        json_file = svg_file.replace(svg_root, json_root).replace('.svg','_s2.json')
         if not osp.exists(svg_file) or not osp.exists(json_file): continue
         inputs.append([svg_file, json_file])
     import mmcv
