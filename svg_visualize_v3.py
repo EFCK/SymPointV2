@@ -288,6 +288,10 @@ if __name__ == "__main__":
                         help='Path to the results file')
     parser.add_argument('--generate_png', action='store_true', default=False,
                         help='Generate PNG files from SVG (requires cairosvg)')
+    parser.add_argument('--semantic', action='store_true', default=False,
+                        help='Use semantic scores from semantic predictions instead of instance scores')
+    parser.add_argument('--out_dir', type=str, default="",
+                        help='Path to the output directory')
     args = parser.parse_args()
     
     from svgnet.evaluation import InstanceEval
@@ -298,8 +302,12 @@ if __name__ == "__main__":
     
 
     res_file = Path(args.res_file) / "model_output.npy"
-    out_dir = Path(args.res_file)
+    if args.out_dir:
+        out_dir = Path(args.out_dir)
+    else:
+        out_dir = Path(args.res_file)
     generate_png = args.generate_png
+    semantic = args.semantic
     os.makedirs(out_dir, exist_ok=True)
     
     detections = np.load(res_file,allow_pickle=True)
@@ -318,19 +326,36 @@ if __name__ == "__main__":
         coords = np.array(args).reshape(-1, 4,2)
         det["instances"] = []
         ins_outs = det["ins"]
+        semantic_bits = det["sem"]
         if not len(ins_outs): continue
         shape = ins_outs[0]["masks"].shape[0]
         sem_out = np.full_like(np.zeros(shape), 35)  # Default to background
         ins_out = np.full_like(np.zeros(shape), -1)  # Default to no instance
         
-        # Process each detected instance
-        for instance in ins_outs:
-            masks, labels = instance["masks"],instance["labels"]
-            scores = instance["scores"]
-            if scores<0.1: continue
-            sem_out[masks] = labels
-            ins_out[masks] = len(det["instances"])  # Assign instance ID
-            det["instances"].append({"masks":masks, "labels":labels,"scores":scores}) 
+        if semantic:
+            sem_out = np.argmax(semantic_bits, axis=1).astype(np.int64)
+            if len(ins_outs) > 0:
+                # Process each detected instance
+                for instance in ins_outs:
+                    masks, labels = instance["masks"],instance["labels"]
+                    scores = instance["scores"]
+                    if scores<0.1: continue
+                    ins_out[masks] = len(det["instances"])  # Assign instance ID
+                    print("labels:", labels)
+                    print("masks:", masks)
+                    print("sem_out[masks]:", sem_out[masks])
+                    det["instances"].append({"masks":masks, "labels":sem_out[masks][0],"scores":scores})        
+        else:
+
+            if len(ins_outs) > 0:
+                # Process each detected instance
+                for instance in ins_outs:
+                    masks, labels = instance["masks"],instance["labels"]
+                    scores = instance["scores"]
+                    if scores<0.1: continue
+                    sem_out[masks] = labels
+                    ins_out[masks] = len(det["instances"])  # Assign instance ID
+                    det["instances"].append({"masks":masks, "labels":labels,"scores":scores}) 
         
         
         coco_res.append({'filepath': det['filepath'],'instances': det['instances']})
