@@ -5,6 +5,8 @@ from collections import Counter
 from svgpathtools import parse_path
 import re, math
 from svgnet.data.svg import SVG_CATEGORIES
+from pathlib import Path
+
 from PIL import Image, ImageDraw, ImageFont
 
 Image.MAX_IMAGE_PIXELS = None
@@ -282,10 +284,8 @@ if __name__ == "__main__":
     import argparse
     
     parser = argparse.ArgumentParser(description='SVG Visualization with Model Predictions')
-    parser.add_argument('--res_file', type=str, default="./sem_ins_split_val.npy",
+    parser.add_argument('--res_file', type=str, default="./results/floorplancad/",
                         help='Path to the results file')
-    parser.add_argument('--out_dir', type=str, default="./results",
-                        help='Output directory for results')
     parser.add_argument('--generate_png', action='store_true', default=False,
                         help='Generate PNG files from SVG (requires cairosvg)')
     args = parser.parse_args()
@@ -296,8 +296,9 @@ if __name__ == "__main__":
                                  ignore_label=35,gpu_num=1)
     logger = get_root_logger()
     
-    res_file = args.res_file
-    out_dir = args.out_dir
+
+    res_file = Path(args.res_file) / "model_output.npy"
+    out_dir = Path(args.res_file)
     generate_png = args.generate_png
     os.makedirs(out_dir, exist_ok=True)
     
