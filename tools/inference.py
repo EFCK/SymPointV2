@@ -98,8 +98,8 @@ def main():
                 total_times.append(t2-t1)
                 
                 # Only evaluate if we have ground truth
+                sem_preds = torch.argmax(res["semantic_scores"],dim=1).cpu().numpy()
                 if has_gt_data and has_ground_truth(svg_file):
-                    sem_preds = torch.argmax(res["semantic_scores"],dim=1).cpu().numpy()
                     sem_gts = res["semantic_labels"].cpu().numpy()
                     sem_point_eval.update(sem_preds, sem_gts)
                     instance_eval.update(
