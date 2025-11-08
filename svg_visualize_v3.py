@@ -341,9 +341,6 @@ if __name__ == "__main__":
                     scores = instance["scores"]
                     if scores<0.1: continue
                     ins_out[masks] = len(det["instances"])  # Assign instance ID
-                    print("labels:", labels)
-                    print("masks:", masks)
-                    print("sem_out[masks]:", sem_out[masks])
                     det["instances"].append({"masks":masks, "labels":sem_out[masks][0],"scores":scores})        
         else:
 
