@@ -66,7 +66,7 @@ def parse_color_to_rgb(color_str):
     return [0, 0, 0]
 
 
-def parse_element(element, ns, layer_id, commands, args, lengths, semanticIds, instanceIds, strokes, layerIds, widths, inst_infos):
+def parse_element(element, ns, layer_id, commands, args, lengths, semanticIds, instanceIds, strokes, layerIds, widths, inst_infos, counts):
     """
     Parse individual SVG elements (path, circle, ellipse).
     Handles both elements with and without instanceId/semanticId attributes.
@@ -107,16 +107,16 @@ def parse_element(element, ns, layer_id, commands, args, lengths, semanticIds, i
         try:
             path_length = path_repre.length()
             if path_length < 1e-10:
+                counts["c2"] += 1
                 # Degenerate path - use start point for all samples
                 start_point = path_repre[0].start
                 for _ in inds:
-                    print("we use the start point")
                     arg.extend([start_point.real, start_point.imag])
             else:
                 # Normal path - sample points
                 for ind in inds:
                     point = path_repre.point(ind)
-                    print("we use the point")
+                    counts["c1"] += 1
                     arg.extend([point.real, point.imag])
         except (RuntimeError, ValueError) as e:
             # If point sampling fails, use the start point
@@ -124,11 +124,12 @@ def parse_element(element, ns, layer_id, commands, args, lengths, semanticIds, i
                 start_point = path_repre[0].start
                 for _ in inds:
                     arg.extend([start_point.real, start_point.imag])
+                counts["e1"] += 1
             except (AttributeError, IndexError):
                 # Last resort: use origin
                 for _ in inds:
-                    print("we use the origin")
                     arg.extend([0.0, 0.0])
+                counts["e2"] += 1
         
         args.append(arg)
         inst_infos[(instanceId, semanticId)].extend(arg)
@@ -180,6 +181,7 @@ def parse_element(element, ns, layer_id, commands, args, lengths, semanticIds, i
         args.append(arg)
         inst_infos[(instanceId, semanticId)].extend(arg)
 
+    return counts
 
 def parse_svg(svg_file):
     tree = ET.parse(svg_file)
@@ -196,6 +198,7 @@ def parse_svg(svg_file):
     layerIds = []
     widths = []
     inst_infos = defaultdict(list)
+    counts = {"c1":0, "c2":0, "e1":0, "e2":0}
     
     # Check if SVG has <g> tags
     groups = list(root.iter(ns + 'g'))
@@ -207,36 +210,35 @@ def parse_svg(svg_file):
             id += 1
             # path
             for path in g.iter(ns + 'path'):
-                parse_element(path, ns, id, commands, args, lengths, semanticIds, 
-                             instanceIds, strokes, layerIds, widths, inst_infos)
+                counts = parse_element(path, ns, id, commands, args, lengths, semanticIds, 
+                             instanceIds, strokes, layerIds, widths, inst_infos, counts)
             
             # circle
             for circle in g.iter(ns + 'circle'):
-                parse_element(circle, ns, id, commands, args, lengths, semanticIds, 
-                             instanceIds, strokes, layerIds, widths, inst_infos)
+                counts = parse_element(circle, ns, id, commands, args, lengths, semanticIds, 
+                             instanceIds, strokes, layerIds, widths, inst_infos, counts)
             
             # ellipse
             for ellipse in g.iter(ns + 'ellipse'):
-                parse_element(ellipse, ns, id, commands, args, lengths, semanticIds, 
-                             instanceIds, strokes, layerIds, widths, inst_infos)
+                counts = parse_element(ellipse, ns, id, commands, args, lengths, semanticIds, 
+                             instanceIds, strokes, layerIds, widths, inst_infos, counts)
     else:
         # New format: paths are directly under root (no <g> tags)
+        # To maintain consistent ordering, collect all elements with their document order
         id = 1
-        # Parse all path elements directly from root
-        for path in root.iter(ns + 'path'):
-            parse_element(path, ns, id, commands, args, lengths, semanticIds, 
-                         instanceIds, strokes, layerIds, widths, inst_infos)
+        all_elements = []
         
-        # Parse all circle elements directly from root
-        for circle in root.iter(ns + 'circle'):
-            parse_element(circle, ns, id, commands, args, lengths, semanticIds, 
-                         instanceIds, strokes, layerIds, widths, inst_infos)
+        # Collect all drawable elements with their position in the document
+        for i, child in enumerate(root):
+            if child.tag in [ns + 'path', ns + 'circle', ns + 'ellipse']:
+                all_elements.append((i, child))
         
-        # Parse all ellipse elements directly from root
-        for ellipse in root.iter(ns + 'ellipse'):
-            parse_element(ellipse, ns, id, commands, args, lengths, semanticIds, 
-                         instanceIds, strokes, layerIds, widths, inst_infos)
+        # Process in document order (maintains spatial coherence like g-tag version)
+        for _, element in all_elements:
+            counts = parse_element(element, ns, id, commands, args, lengths, semanticIds, 
+                         instanceIds, strokes, layerIds, widths, inst_infos, counts)
     
+    print(f"normal: {counts['c1']}, degenerate: {counts['c2']}, error: {counts['e1']}, zero-length: {counts['e2']}")
     # Validate results
     if len(args) == 0:
         # Empty SVG - return minimal structure
