@@ -133,9 +133,6 @@ class SVGNet(nn.Module):
         mask_cls = F.softmax(mask_cls, dim=-1)[...,:-1] # Q,C
         mask_pred = mask_pred.sigmoid() # Q,G
         semseg = torch.einsum("bqc,bqg->bgc", mask_cls, mask_pred)
-        print("semseg:", semseg)
-        print("mask_cls:", mask_cls)
-        print("mask_pred:", mask_pred)
         return semseg[0]
 
     def instance_inference(self,mask_cls,mask_pred,overlap_threshold=0.8):
