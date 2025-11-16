@@ -317,7 +317,6 @@ if __name__ == "__main__":
     for det in tqdm.tqdm(detections):
         
         svg_path = det["filepath"].replace("_s2.svg", ".svg")
-        print(svg_path)
         #if "241f" not in svg_path: continue
         assert os.path.exists(svg_path) is True,"svg_file not exists!!!"
         parsing_list = svg_reader(svg_path)
@@ -332,7 +331,9 @@ if __name__ == "__main__":
         sem_out = np.full_like(np.zeros(shape), 35)  # Default to background
         ins_out = np.full_like(np.zeros(shape), -1)  # Default to no instance
         
+
         if semantic:
+            # instance varsa instance id'yi semantik id'ye eşleştir yoksa seamntik id yi kullan.
             sem_out = np.argmax(semantic_bits, axis=1).astype(np.int64)
             if len(ins_outs) > 0:
                 # Process each detected instance
@@ -340,6 +341,7 @@ if __name__ == "__main__":
                     masks, labels = instance["masks"],instance["labels"]
                     scores = instance["scores"]
                     if scores<0.1: continue
+                    sem_out[masks] = labels
                     ins_out[masks] = len(det["instances"])  # Assign instance ID
                     det["instances"].append({"masks":masks, "labels":sem_out[masks][0],"scores":scores})        
         else:
