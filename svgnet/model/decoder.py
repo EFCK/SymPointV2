@@ -111,7 +111,39 @@ class Decoder(nn.Module):
         
         new_element_features = torch.zeros_like(element_features)
         assert element_features.shape[0]==layerids.shape[0]
+
+        # skip_layer_aggregation = True
+        # if num_unique_layers < 3:
+        #     largest_layer_size = max([(layerids == lid).sum().item() for lid in unique_layers])
+        #     if largest_layer_size > 0.8 * total_elements:
+        #         skip_layer_aggregation = True
+        
         for lid in torch.unique(layerids):
+
+            # identity aggregation -> didnt worked
+            # if skip_layer_aggregation:
+            #     # No meaningful layer info - use element's own features instead of layer aggregation
+            #     # This preserves local spatial information
+            #     avg_pool = layer_point_feat  # Use element's own feature instead of layer average
+            #     max_pool = layer_point_feat  # Use element's own feature instead of layer max
+            #     features = torch.cat((avg_pool, max_pool), dim=1)  # Concatenate along feature dim
+                
+            #     # Attention pool is just the element itself
+            #     attention_pool = layer_point_feat
+                
+            #     # Concatenate features - now each element keeps its own identity
+            #     combined_features = torch.cat((features, attention_pool), dim=1)  # Shape: [N, planes*3]
+                
+            #     # Apply transformations element-wise
+            #     layer_features = self.fc1(combined_features)
+            #     layer_features = F.relu(layer_features)
+            #     layer_features = self.fc2(layer_features)
+                
+            #     # Concatenate with original features
+            #     combined_features = torch.cat([layer_point_feat, layer_features], dim=1)
+            #     output = self.fc_concat(combined_features)
+            #     new_element_features[ind] = output
+
             ind = torch.where(layerids==lid)[0]
             layer_point_feat = element_features[ind]
             # 多尺度特征提取
@@ -291,7 +323,27 @@ class Decoder(nn.Module):
         
         pos_encodings_pcd = self.get_pos_encs(coords[:-1])
         
+        # skip fusion -> better than identity, still not good 
+
+        # # Check if layer information is meaningful
+        # # If not, skip fusion and use backbone features directly
+        # unique_layers = torch.unique(layerIds)
+        # num_unique_layers = len(unique_layers)
+        # total_elements = layerIds.shape[0]
+        
+        # skip_fusion = False
+        # if num_unique_layers < 3:
+        #     largest_layer_size = max([(layerIds == lid).sum().item() for lid in unique_layers])
+        #     if largest_layer_size > 0.8 * total_elements:
+        #         skip_fusion = True
+        
+        # if skip_fusion:
+        #     # No meaningful layer information - use backbone features directly
+        #     fusion_features = srcs[-1]
+        # else:
+        # Apply layer fusion as normal
         fusion_features = self.fusionLayerFeats(srcs[-1], layerIds)
+        
         mask_features = self.mask_features_head(fusion_features)
         
 
